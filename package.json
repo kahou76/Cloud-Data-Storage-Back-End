@@ -1,0 +1,28 @@
+{
+  "name": "cloud-data-storage-back-end",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kahou76/Cloud-Data-Storage-Back-End.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kahou76/Cloud-Data-Storage-Back-End/issues"
+  },
+  "homepage": "https://github.com/kahou76/Cloud-Data-Storage-Back-End#readme",
+  "devDependencies": {
+    "nodemon": "^2.0.21"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.1328.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  }
+}
