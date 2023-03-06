@@ -26,7 +26,7 @@
 
     // Load Data button handler
     app.post('/load-data', async (req, res) => {
-    try {
+      try {
         // Get object content from the URL
         const objectContent = await getObjectContentFromUrl('https://s3-us-west-2.amazonaws.com/css490/input.txt');
 
@@ -34,15 +34,60 @@
         await saveObjectToBucket('prog4storagebucket', 'input.txt', objectContent);
 
         // Parse object content and save to DynamoDB table
-        const items = parseObjectContent(objectContent);
-        await saveItemsToDynamoDB('prog4database', items);
+        const items = await parseObjectContent(objectContent);
+        for (const item of items) {
+          const { LastName, FirstName } = item;
+          const tableName = getTableName(LastName.S, FirstName.S);
+
+          try {
+            // Check if table already exists
+            await dynamodb.describeTable({ TableName: tableName }).promise();
+            console.log(`Table already exists: ${tableName}`);
+          } catch (err) {
+            // Create table if it doesn't exist
+            if (err.code === 'ResourceNotFoundException') {
+              await dynamodb.createTable({
+                TableName: tableName,
+                KeySchema: [
+                  { AttributeName: 'LastName', KeyType: 'HASH' },
+                  { AttributeName: 'FirstName', KeyType: 'RANGE' }
+                ],
+                AttributeDefinitions: [
+                  { AttributeName: 'LastName', AttributeType: 'S' },
+                  { AttributeName: 'FirstName', AttributeType: 'S' }
+                ],
+                ProvisionedThroughput: { ReadCapacityUnits: 5, WriteCapacityUnits: 5 }
+              }).promise();
+              console.log(`Table created: ${tableName}`);
+            } else {
+              // Table already exists, do nothing
+              console.log(`Table already exists: ${tableName}`);
+            }
+          }
+
+          // Check if item already exists in the table
+          const existingItem = await dynamodb.getItem({
+            TableName: tableName,
+            Key: {
+              LastName: { S: LastName.S },
+              FirstName: { S: FirstName.S }
+            }
+          }).promise();
+
+          if (existingItem.Item) {
+            console.log(`Item already exists in table ${tableName}:`, existingItem.Item);
+          } else {
+            await saveItemsToDynamoDB(tableName, [item]);
+          }
+        }
 
         res.status(200).send('Data loaded successfully!');
-    } catch (error) {
+      } catch (error) {
         console.error(error);
         res.status(500).send('Error loading data!');
-    }
+      }
     });
+
 
     // Clear Data button handler
     app.post('/clear-data', async (req, res) => {
@@ -77,92 +122,69 @@
     });
 
     // Helper functions
-
     async function getObjectContentFromUrl(url) {
-    const response = await fetch(url);
-    const content = await response.text();
-    return content;
+      const response = await fetch(url);
+      const content = await response.text();
+      return content;
     }
 
     async function saveObjectToBucket(bucketName, objectKey, objectContent) {
-    const params = { Bucket: bucketName, Key: objectKey, Body: objectContent, ACL: 'public-read' };
-    const result = await s3.putObject(params).promise();
-    console.log(`Object saved to S3: s3://${bucketName}/${objectKey}`);
+      const params = { Bucket: bucketName, Key: objectKey, Body: objectContent, ACL: 'public-read' };
+      const result = await s3.putObject(params).promise();
+      console.log(`Object saved to S3: s3://${bucketName}/${objectKey}`);
     }
 
     async function deleteObjectFromBucket(bucketName, objectKey) {
-    const params = { Bucket: bucketName, Key: objectKey };
-    const result = await s3.deleteObject(params).promise();
-    console.log(`Object deleted from S3: s3://${bucketName}/${objectKey}`);
+      const params = { Bucket: bucketName, Key: objectKey };
+      await s3.headObject(params).promise().catch((err) => {
+        console.log(`Object s3://${bucketName}/${objectKey} does not exist`);
+        throw err;
+      });
+      const result = await s3.deleteObject(params).promise();
+      console.log(`Object deleted from S3: s3://${bucketName}/${objectKey}`);
+    }
+    
+    async function doesTableExist(tableName) {
+      try {
+        await dynamodb.describeTable({TableName: tableName}).promise();
+        return true;
+      } catch (error) {
+        if (error.code === 'ResourceNotFoundException') {
+          return false;
+        }
+        throw error;
+      }
     }
 
-    function parseObjectContent(objectContent) {
-        if (!objectContent) {
-            return [];
+    async function parseObjectContent(objectContent) {
+      const items = objectContent.split('\n').map(item => {
+        const [lastName, firstName, ...attributes] = item.split(' ');
+        const itemObject = {};
+        itemObject['LastName'] = { S: lastName };
+        itemObject['FirstName'] = { S: firstName };
+        attributes.forEach(attribute => {
+          const [key, value] = attribute.split('=');
+          itemObject[key] = { S: value };
+        });
+        return itemObject;
+      });
+      return items;
+    }
+    
+    async function saveItemsToDynamoDB(tableName, items) {
+      const params = {
+        RequestItems: {
+          [tableName]: items.map(item => ({ PutRequest: { Item: item } }))
         }
-        const items = [];
-        const lines = objectContent.split('\n');
-        for (const line of lines) {
-          console.log(`Parsing line: ${line}`);
-          const [fullName, ...properties] = line.trim().split(/\s+/);
-          console.log(`Full name: ${fullName}`);
-          console.log(`Properties: ${properties}`);
-          const [lastName, firstName] = fullName.split(',');
-          console.log(`Last name: ${lastName}`);
-          console.log(`First name: ${firstName}`);
-          const item = { lastName, firstName };
-          for (const property of properties) {
-            const [key, value] = property.split('=');
-            console.log(`Key: ${key}`);
-            console.log(`Value: ${value}`);
-            item[key] = value;
-          }
-          console.log(`Parsed item: ${JSON.stringify(item)}`);
-          items.push(item);
-        }
-        return items;
-      }
-      
-      async function saveItemsToDynamoDB(items) {
-        try {
-          //const dynamodb = new AWS.DynamoDB();
-          const tableName = 'prog4database';
-          for (const item of items) {
-            const params = {
-              TableName: tableName,
-              Item: {
-                'id': { S: item.id },
-              },
-            };
-      
-            if (item.firstName) {
-              params.Item.firstName = { S: item.firstName };
-            }
-      
-            if (item.lastName) {
-              params.Item.lastName = { S: item.lastName };
-            }
-      
-            if (item.age) {
-              params.Item.age = { N: item.age.toString() };
-            }
-      
-            if (item.album) {
-              params.Item.album = { S: item.album };
-            }
-      
-            if (item.happy) {
-              params.Item.happy = { BOOL: item.happy };
-            }
-      
-            await dynamodb.putItem(params).promise();
-          }
-      
-          console.log('Items saved to DynamoDB');
-        } catch (err) {
-          console.log(err);
-        }
-      }
+      };
+      await dynamodb.batchWriteItem(params).promise();
+      console.log(`Items saved to DynamoDB table: ${tableName}`);
+    }
+    
+    function getTableName(lastName, firstName) {
+      return `${lastName.toLowerCase()}${firstName.toLowerCase()}`;
+    }
+    
       
       
 
