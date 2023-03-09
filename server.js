@@ -31,6 +31,7 @@
       } catch (error) {
           console.error(error);
           res.status(500).send('Error loading data!');
+          res.status(500).send(error);
       }
       });
   
@@ -47,6 +48,7 @@
       } catch (error) {
           console.error(error);
           res.status(500).send('Error clearing data!');
+          res.status(500).send(error);
       }
       });
   
@@ -62,6 +64,7 @@
         } catch (error) {
           console.error(error);
           res.status(500).send('Error querying data!');
+          res.status(500).send(error);
         }
       });
       
