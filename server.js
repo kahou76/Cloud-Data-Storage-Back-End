@@ -1,99 +1,95 @@
-    const AWS = require('aws-sdk');
-    const express = require('express');
-    const cors = require('cors');
-    const app = express();
+const AWS = require('aws-sdk');
+const express = require('express');
+const cors = require('cors');
+const fetch = require('node-fetch');
 
-    app.use(cors());
-    app.use(express.json());
+const app = express();
+app.use(cors());
+app.use(express.json());
 
-    // create an instance of the S3 class
-    const s3 = new AWS.S3({ region: 'us-west-2' });
+// configure the AWS SDK with access key and secret key
+AWS.config.update({
+  accessKeyId: 'AKIA474564FILNRCTPC6',
+  secretAccessKey: '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',
+  region: 'us-west-2'
+});
 
-    // configure the AWS SDK with access key and secret key
-    AWS.config.update({
-        accessKeyId: "AKIA474564FILNRCTPC6",
-        secretAccessKey: "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",
-        region: 'us-west-2'
-    });
+// create an instance of the S3 class
+const s3 = new AWS.S3();
 
-    const docClient = new AWS.DynamoDB.DocumentClient({
-        region: 'us-west-2', // replace with your region
-        credentials: new AWS.SharedIniFileCredentials({ profile: 'default' }) // replace with your AWS credentials
-      });
+const docClient = new AWS.DynamoDB.DocumentClient({
+  region: 'us-west-2'
+});
 
-    // Load Data button handler
-    app.post('/load', async (req, res) => {
-      try {
-          // Get object content from the URL
-          const objectContent = await getObjectContentFromUrl('https://s3-us-west-2.amazonaws.com/css490/input.txt');
-  
-          // Save object to S3 bucket
-          await saveObjectToBucket('prog4storagebucket', 'input.txt', objectContent);
-  
-          // Parse object content and save to DynamoDB table
-          const items = parseObjectContent(objectContent);
-          await saveItemsToDynamoDB('prog4database', items);
-  
-          res.status(200).send('Data loaded successfully!!!!!');
-      } catch (error) {
-          console.error(error);
-          res.status(500).send('Error loading data!!!!!');
-          res.status(500).send(error);
-      }
-      });
-  
-      // Clear Data button handler
-      app.post('/clear', async (req, res) => {
-      try {
-          // Delete object from S3 bucket
-          await deleteObjectFromBucket('prog4storagebucket', 'input.txt');
-  
-          // Delete items from DynamoDB table
-          await clearItemsFromDynamoDB('prog4database');
-  
-          res.status(200).send('Data cleared successfully!');
-      } catch (error) {
-          console.error(error);
-          res.status(500).send('Error clearing data!');
-          res.status(500).send(error);
-      }
-      });
-  
-      // Query button handler
-      app.post('/query', async (req, res) => {
-        try {
-          const firstName = req.body.firstName;
-          const lastName = req.body.lastName;
-      
-          // Query items from DynamoDB table
-          const items = await queryItemsFromDynamoDB('prog4database', firstName, lastName);
-          res.status(200).send(items);
-        } catch (error) {
-          console.error(error);
-          res.status(500).send('Error querying data!');
-          res.status(500).send(error);
-        }
-      });
-      
-  
-      // Helper functions
-      async function getObjectContentFromUrl(url) {
-      const response = await fetch(url);
-      const content = await response.text();
-      return content;
-      }
-  
-      async function saveObjectToBucket(bucketName, objectKey, objectContent) {
-      const params = { Bucket: bucketName, Key: objectKey, Body: objectContent, ACL: 'public-read' };
-      const result = await s3.putObject(params).promise();
-      console.log(`Object saved to S3: s3://${bucketName}/${objectKey}`);
-      }
-  
-      async function deleteObjectFromBucket(bucketName, objectKey) {
-      const params = { Bucket: bucketName, Key: objectKey };
-      const result = await s3.deleteObject(params).promise();
-      console.log(`Object deleted from S3: s3://${bucketName}/${objectKey}`);
-      }
+// Load Data button handler
+app.post('/load', async (req, res) => {
+  try {
+    // Get object content from the URL
+    const objectContent = await getObjectContentFromUrl('https://s3-us-west-2.amazonaws.com/css490/input.txt');
+
+    // Save object to S3 bucket
+    await saveObjectToBucket('prog4storagebucket', 'input.txt', objectContent);
+
+    // Parse object content and save to DynamoDB table
+    const items = parseObjectContent(objectContent);
+    await saveItemsToDynamoDB('prog4database', items);
+
+    res.status(200).send('Data loaded successfully!!!!!');
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Error loading data!!!!!');
+  }
+});
+
+// Clear Data button handler
+app.post('/clear', async (req, res) => {
+  try {
+    // Delete object from S3 bucket
+    await deleteObjectFromBucket('prog4storagebucket', 'input.txt');
+
+    // Delete items from DynamoDB table
+    await clearItemsFromDynamoDB('prog4database');
+
+    res.status(200).send('Data cleared successfully!');
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Error clearing data!');
+  }
+});
+
+// Query button handler
+app.post('/query', async (req, res) => {
+  try {
+    const firstName = req.body.firstName;
+    const lastName = req.body.lastName;
+
+    // Query items from DynamoDB table
+    const items = await queryItemsFromDynamoDB('prog4database', firstName, lastName);
+    res.status(200).send(items);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Error querying data!');
+  }
+});
+
+// Helper functions
+async function getObjectContentFromUrl(url) {
+  const response = await fetch(url);
+  const content = await response.text();
+  return content;
+}
+
+async function saveObjectToBucket(bucketName, objectKey, objectContent) {
+  const params = { Bucket: bucketName, Key: objectKey, Body: objectContent, ACL: 'public-read' };
+  const result = await s3.putObject(params).promise();
+  console.log(`Object saved to S3: s3://${bucketName}/${objectKey}`);
+}
+
+async function deleteObjectFromBucket(bucketName, objectKey) {
+  const params = { Bucket: bucketName, Key: objectKey };
+  const result = await s3.deleteObject(params).promise();
+  console.log(`Object deleted from S3: s3://${bucketName}/${objectKey}`);
+}
   
       function parseObjectContent(objectContent) {
         const items = [];
