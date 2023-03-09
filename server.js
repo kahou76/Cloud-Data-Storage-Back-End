@@ -9,6 +9,13 @@
     // create an instance of the S3 class
     const s3 = new AWS.S3({ region: 'us-west-2' });
 
+    // configure the AWS SDK with access key and secret key
+    AWS.config.update({
+        accessKeyId: "AKIA474564FILNRCTPC6",
+        secretAccessKey: "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",
+        region: 'us-west-2'
+    });
+
     const docClient = new AWS.DynamoDB.DocumentClient({
         region: 'us-west-2', // replace with your region
         credentials: new AWS.SharedIniFileCredentials({ profile: 'default' }) // replace with your AWS credentials
