@@ -1,20 +1,12 @@
-// import fetch from 'node-fetch';
 const AWS = require('aws-sdk');
 const express = require('express');
 const cors = require('cors');
 // const fetch = require('node-fetch');
 
 const app = express();
-// const fetch = require('node-fetch');
 app.use(cors());
 app.use(express.json());
 
-// configure the AWS SDK with access key and secret key
-AWS.config.update({
-  accessKeyId: 'AKIA474564FILNRCTPC6',
-  secretAccessKey: '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',
-  region: 'us-west-2'
-});
 
 // create an instance of the S3 class
 const s3 = new AWS.S3();
@@ -75,24 +67,11 @@ app.post('/query', async (req, res) => {
 });
 
 // Helper functions
-const https = require('https');
 async function getObjectContentFromUrl(url) {
-  return new Promise((resolve, reject) => {
-    https.get(url, (response) => {
-      let data = '';
-      response.on('data', (chunk) => {
-        data += chunk;
-      });
-      response.on('end', () => {
-        resolve(data);
-      });
-    }).on('error', (error) => {
-      reject(error);
-    });
-  });
+  const response = await fetch(url);
+  const content = await response.text();
+  return content;
 }
-
-
 
 async function saveObjectToBucket(bucketName, objectKey, objectContent) {
   const params = { Bucket: bucketName, Key: objectKey, Body: objectContent, ACL: 'public-read' };
