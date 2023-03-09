@@ -1,9 +1,11 @@
+// import fetch from 'node-fetch';
 const AWS = require('aws-sdk');
 const express = require('express');
 const cors = require('cors');
 // const fetch = require('node-fetch');
 
 const app = express();
+// const fetch = require('node-fetch');
 app.use(cors());
 app.use(express.json());
 
@@ -74,10 +76,12 @@ app.post('/query', async (req, res) => {
 
 // Helper functions
 async function getObjectContentFromUrl(url) {
+  const fetch = await import('node-fetch');
   const response = await fetch(url);
-  const content = await response.text();
-  return content;
+  const text = await response.text();
+  return text;
 }
+
 
 async function saveObjectToBucket(bucketName, objectKey, objectContent) {
   const params = { Bucket: bucketName, Key: objectKey, Body: objectContent, ACL: 'public-read' };
