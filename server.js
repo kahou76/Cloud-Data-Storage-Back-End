@@ -27,10 +27,10 @@
           const items = parseObjectContent(objectContent);
           await saveItemsToDynamoDB('prog4database', items);
   
-          res.status(200).send('Data loaded successfully!');
+          res.status(200).send('Data loaded successfully!!!!!');
       } catch (error) {
           console.error(error);
-          res.status(500).send('Error loading data!');
+          res.status(500).send('Error loading data!!!!!');
           res.status(500).send(error);
       }
       });
