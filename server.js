@@ -75,12 +75,23 @@ app.post('/query', async (req, res) => {
 });
 
 // Helper functions
+const https = require('https');
 async function getObjectContentFromUrl(url) {
-  const fetch = await import('node-fetch');
-  const response = await fetch(url);
-  const text = await response.text();
-  return text;
+  return new Promise((resolve, reject) => {
+    https.get(url, (response) => {
+      let data = '';
+      response.on('data', (chunk) => {
+        data += chunk;
+      });
+      response.on('end', () => {
+        resolve(data);
+      });
+    }).on('error', (error) => {
+      reject(error);
+    });
+  });
 }
+
 
 
 async function saveObjectToBucket(bucketName, objectKey, objectContent) {
