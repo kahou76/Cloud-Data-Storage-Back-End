@@ -97,75 +97,85 @@ async function deleteObjectFromBucket(bucketName, objectKey) {
   console.log(`Object deleted from S3: s3://${bucketName}/${objectKey}`);
 }
   
-      function parseObjectContent(objectContent) {
-        const items = [];
-        const lines = objectContent.split('\n');
-        for (const line of lines) {
-          const [lastName, firstName, ...properties] = line.trim().split(/\s+/);
-          const item = { lastName, firstName };
-          for (const property of properties) {
-            const [key, value] = property.split('=');
-            item[key] = value;
-          }
-          items.push(item);
-        }
-        return items;
+function parseObjectContent(objectContent) {
+  const items = [];
+  const lines = objectContent.split('\n');
+  for (const line of lines) {
+    const [lastName, firstName, ...properties] = line.trim().split(/\s+/);
+    const item = { lastName, firstName };
+    for (const property of properties) {
+      const [key, value] = property.split('=');
+      item[key] = value;
+    }
+    items.push(item);
+  }
+  console.log(`Parsed ${items.length} items from object content`);
+  return items;
+}
+
+async function saveItemsToDynamoDB(tableName, items) {
+  const params = {
+    TableName: tableName
+  };
+  for (const item of items) {
+    console.log(`Saving item ${JSON.stringify(item)}`);
+    if (!item.lastName) {
+      console.log('Skipping item with empty lastName');
+      continue;
+    }
+    const itemParams = {
+      ...params,
+      Item: {
+        lastName: item.lastName,
+        firstName: item.firstName
       }
-      
-      async function saveItemsToDynamoDB(tableName, items) {
-        const params = {
-          TableName: tableName
-        };
-        for (const item of items) {
-          const itemParams = {
-            ...params,
-            Item: {
-              lastName: item.lastName,
-              firstName: item.firstName
-            }
+    };
+    for (const key in item) {
+      if (key !== 'firstName' && key !== 'lastName') {
+        itemParams.Item[key] = String(item[key]); // convert all attributes to String type
+      }
+    }
+
+    // check if item already exists
+    const existingItem = await docClient.get({
+      TableName: tableName,
+      Key: {
+        lastName: item.lastName,
+        firstName: item.firstName
+      }
+    }).promise();
+
+    if (existingItem.Item) {
+      // update existing item
+      const updateParams = {
+        TableName: tableName,
+        Key: {
+          lastName: item.lastName,
+          firstName: item.firstName
+        },
+        AttributeUpdates: {}
+      };
+
+      for (const key in item) {
+        if (key !== 'firstName' && key !== 'lastName') {
+          updateParams.AttributeUpdates[key] = {
+            Action: 'PUT',
+            Value: String(item[key])
           };
-          for (const key in item) {
-            if (key !== 'firstName' && key !== 'lastName') {
-              itemParams.Item[key] = String(item[key]); // convert all attributes to String type
-            }
-          }
-      
-          // check if item already exists
-          const existingItem = await docClient.get({
-            TableName: tableName,
-            Key: {
-              lastName: item.lastName,
-              firstName: item.firstName
-            }
-          }).promise();
-      
-          if (existingItem.Item) {
-            // update existing item
-            const updateParams = {
-              TableName: tableName,
-              Key: {
-                lastName: item.lastName,
-                firstName: item.firstName
-              },
-              AttributeUpdates: {}
-            };
-      
-            for (const key in item) {
-              if (key !== 'firstName' && key !== 'lastName') {
-                updateParams.AttributeUpdates[key] = {
-                  Action: 'PUT',
-                  Value: String(item[key])
-                };
-              }
-            }
-      
-            await docClient.update(updateParams).promise();
-          } else {
-            // create new item
-            await docClient.put(itemParams).promise();
-          }
         }
       }
+
+      console.log(`Updating existing item with params ${JSON.stringify(updateParams)}`);
+      await docClient.update(updateParams).promise();
+    } else {
+      // create new item
+      console.log(`Creating new item with params ${JSON.stringify(itemParams)}`);
+      await docClient.put(itemParams).promise();
+    }
+  }
+}
+
+
       
       async function queryItemsFromDynamoDB(tableName, firstName, lastName) {
         console.log(`Querying items with first name: ${firstName} and last name: ${lastName}`);
